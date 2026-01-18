@@ -1,0 +1,321 @@
+---
+title: "Viz and Share"
+output:
+  html_document:
+    df_print: paged
+---
+
+# The data cleaned and in the right format?
+
+As soon as you opena data file, you must check the data types with **str()**:
+
+```{r str, eval=TRUE, echo=TRUE, message=FALSE}
+rm(list = ls())
+
+###
+git=''
+org=''
+file='ciadata.rds'
+gitLocation=paste0(git,org)
+fullLocation=paste0(gitLocation,file)
+cia=readRDS(url(fullLocation))
+
+##
+str(cia)
+```
+
+
+# You may have several variables...but
+
+You just do not open a data file for a random reason. You have a purpose. 
+
+## Which is your variable of interest?
+
+* Life Expectancy
+
+## Which are you considering as explanatory variables?
+
+* Infant mortality rate
+* Maternal mortality rate
+
+## Any Control Variable?
+
+* GINI index
+* Region
+
+# Exploration
+
+Do not plan any advanced work if you have not explored the set of columns you need.
+
+## Univariate : Your variable of interest
+
+### key stats
+
+```{r var_summary, eval=TRUE, echo=TRUE, message=FALSE}
+summary(cia$life_exp)
+```
+
+The above may be supplemented by:
+```{r var_skew, eval=TRUE, echo=TRUE, message=FALSE}
+library(moments)
+skewness(cia$life_exp)
+```
+
+The tail is to the left (would be to the right if positive)
+
+### Visual
+
+How to highlight the stats above?
+
+```{r call_ggplot2, eval=TRUE, echo=TRUE, message=FALSE}
+# call the library
+library(ggplot2) # do not expect an important message
+```
+
+```{r gg_base, eval=TRUE, echo=TRUE, message=FALSE}
+# tell ggplot the data you will use 
+base=ggplot(data=cia) # I call it 'base'
+```
+
+```{r gg_geom_aes, eval=TRUE, echo=TRUE, message=FALSE}
+# add the desired 'geom'
+base + geom_boxplot( # you want a boxplot
+                    aes(x=life_exp) # aes for the 'vars'
+                    )
+
+```
+
+```{r histo, eval=TRUE, echo=TRUE, message=FALSE}
+# this is another alternative
+base + geom_histogram(aes(x=life_exp),bins = 10)
+```
+
+Let's choose the boxplot and add some **textual** decorations:
+
+
+```{r text_forplot, eval=TRUE, echo=TRUE, message=FALSE}
+# detecting the worst case
+worstCase=cia[which.min(cia$life_exp),'name']
+# preparing a message
+theCaption=paste("Source:CIA\n","Worst case:",worstCase)  
+
+# text for titles
+theTitle='People live more than 70 years around the world'
+theSubtitle="147 countries, 2023"
+
+# time te REPLOT
+box=base + geom_boxplot(aes(x=life_exp))
+box + labs(title=theTitle,
+           subtitle = theSubtitle,
+           caption = theCaption,
+           x= 'life expectancy')
+```
+
+## Bivariate
+
+### Key stats
+
+- what about a correlation
+```{r corr_table, message=FALSE}
+corrtable::correlation_matrix(df = cia[,-c(1,5,6)],
+                              use = 'lower',
+                              replace_diagonal = T)
+
+```
+
+### Visuals
+
+- Visualizing the correlation
+
+```{r corr_table_viz, eval=TRUE, echo=TRUE, message=FALSE}
+library(ggcorrplot) # may need installation
+
+# 1. Compute the correlation matrix
+corr_matrix <- cor(cia[, c('life_exp',"infant", "maternal")])
+
+# 2. Plot
+ggcorrplot(corr_matrix)
+```
+
+# Time to test your Hypothesis!
+
+## Key stats
+
+Prepare you hypothesis:
+
+```{r hypo, eval=TRUE, echo=TRUE, message=FALSE}
+# the H
+hypo=formula(life_exp ~ infant + maternal + gini)
+```
+
+Test your hypothesis and see the outcome:
+
+```{r regre_hypo, eval=TRUE, echo=TRUE, message=FALSE}
+model <- lm(hypo, data = cia)
+
+#then
+summary(model)
+```
+
+
+** Above, you just found some important difference between correlation and regression.**
+
+## Visual
+
+Regression coefficients are easy to plot:
+
+```{r regre_viz, eval=TRUE, echo=TRUE, message=FALSE}
+library(sjPlot)
+plot_models(model)
+```
+
+
+# Playing with simple commands and find some insight?
+
+If this is the data:
+
+```{r head_data, eval=TRUE, echo=TRUE, message=FALSE}
+head(cia)
+```
+You can make it 'talk' using basic operations.
+
+## Life expectancy by region?
+
+```{r byregion, eval=TRUE, echo=TRUE, message=FALSE}
+# version 1
+base + geom_boxplot(aes(x=life_exp,y=region))
+```
+
+```{r byregion_ordered, eval=TRUE, echo=TRUE, message=FALSE}
+# version 2
+base + geom_boxplot(aes(x=life_exp,y=reorder(region,life_exp,median)))
+
+```
+
+Which of the above gave you something else to state?
+
+
+## A box plot for each var?
+
+
+Remember this is not right:
+
+```{r box_wrong, eval=TRUE, echo=TRUE, message=FALSE}
+base+geom_boxplot(aes(x=infant,y=infant)) +
+     geom_boxplot(aes(x=maternal,y=maternal)) + labs(y='')
+
+```
+
+
+We need a long shape for **ggplot2**:
+
+```{r cia_toLong, eval=TRUE, echo=TRUE, message=FALSE}
+ciaLong=tidyr::pivot_longer(data=cia[,c(1,2,3,4)],
+                                cols=!name, 
+                                names_to = "vars",
+                                values_to = "index") 
+ciaLong
+```
+
+```{r box_OK, eval=TRUE, echo=TRUE, message=FALSE}
+# then
+base = ggplot(data=ciaLong)
+base + geom_boxplot(aes(x=vars,y=index))
+```
+
+Good data, but visually still weak. What happened? Each variable has different range (min - max). Then:
+
+**Faceting**
+
+```{r facets_free_box, eval=TRUE, echo=TRUE, message=FALSE}
+base2 = ggplot(data=ciaLong)
+base2 + geom_boxplot(aes(y=index)) + 
+  facet_wrap(~ vars, scales = "free")
+```
+
+Facetting is very useful:
+
+```{r facets_free_histo, eval=TRUE, echo=TRUE, message=FALSE}
+base2 = ggplot(data=ciaLong)
+base2 + geom_histogram(aes(x=index),bins=10) + 
+  facet_wrap(vars~., scales = "free", ncol = 1)
+```
+
+## Mortality worst group?
+
+
+We can detect countries in worst groups.
+
+```{r mortal_worst, eval=TRUE, echo=TRUE, message=FALSE}
+# Find the value that marks the top 25% (worst)
+inf_bad <- quantile(cia$infant, 0.75, na.rm = TRUE)
+mat_bad   <- quantile(cia$maternal, 0.75, na.rm = TRUE)
+
+# '1' if in the worst quartile:
+cia$inf_worst <- ifelse(cia$infant >= inf_bad, 1, 0)
+cia$mat_worst   <- ifelse(cia$maternal >= mat_bad, 1, 0)
+
+# flag worst of worst
+cia$worst_infmat=cia$inf_worst + cia$mat_worst
+
+cia$worst_infmat=ifelse(cia$worst_infmat==2,T,F)
+```
+
+Report:
+```{r mortal_worst_agg, eval=TRUE, echo=TRUE, message=FALSE}
+aggregate(worst_infmat ~ region, data = cia, FUN = sum, na.rm = TRUE)
+```
+
+
+## Mortality best group?
+
+```{r mortal_best, eval=TRUE, echo=TRUE, message=FALSE}
+inf_good <- quantile(cia$infant, 0.25, na.rm = TRUE)
+mat_good   <- quantile(cia$maternal, 0.25, na.rm = TRUE)
+
+# NOW 'less than'
+cia$inf_best <- ifelse(cia$infant <= inf_good, 1, 0)
+cia$mat_best   <- ifelse(cia$maternal <= mat_good, 1, 0)
+
+# flag worst of worst
+cia$best_infmat=cia$inf_best + cia$mat_best
+
+cia$best_infmat=ifelse(cia$best_infmat==2,T,F)
+```
+
+Report:
+
+```{r mortal_best_agg, eval=TRUE, echo=TRUE, message=FALSE}
+aggregate(best_infmat ~ region, data = cia, FUN = sum, na.rm = TRUE)
+```
+
+Plotting!
+
+```{rmortal_worst_viz, eval=TRUE, echo=TRUE, message=FALSE}
+# saving as object
+counts_worst <- aggregate(worst_infmat ~ region, data = cia, FUN = sum)
+# filtering
+counts_worst=counts_worst[counts_worst$worst_infmat>0,]
+
+# plotting
+base_worst=ggplot(counts_worst)
+
+base_worst + geom_col(aes(x = reorder(region, -worst_infmat), 
+                       y = worst_infmat)) 
+```
+
+and....
+
+```{r mortal_best_viz, eval=TRUE, echo=TRUE, message=FALSE}
+# saving as object
+counts_best <- aggregate(best_infmat ~ region, data = cia, FUN = sum)
+# filtering
+counts_best=counts_best[counts_best$best_infmat>0,]
+
+# plotting
+base_best=ggplot(data=counts_best)
+
+base_best + geom_col(aes(x = reorder(region, -best_infmat), 
+                       y = best_infmat)) 
+```
+
