@@ -13,8 +13,8 @@ As soon as you opena data file, you must check the data types with **str()**:
 rm(list = ls())
 
 ###
-git=''
-org=''
+git='https://github.com/Marrone-DACSS-601-Homeworks/'
+org='Homework-5/raw/refs/heads/main/'
 file='ciadata.rds'
 gitLocation=paste0(git,org)
 fullLocation=paste0(gitLocation,file)
@@ -291,7 +291,7 @@ aggregate(best_infmat ~ region, data = cia, FUN = sum, na.rm = TRUE)
 
 Plotting!
 
-```{rmortal_worst_viz, eval=TRUE, echo=TRUE, message=FALSE}
+```{r mortal_worst_viz, eval=TRUE, echo=TRUE, message=FALSE}
 # saving as object
 counts_worst <- aggregate(worst_infmat ~ region, data = cia, FUN = sum)
 # filtering
